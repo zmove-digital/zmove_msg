@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Importar contatos da agenda do aparelho (inclui os sincronizados pelo WhatsApp) -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
         android:label="ZMove Msg"

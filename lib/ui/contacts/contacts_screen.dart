@@ -12,6 +12,7 @@ import '../../services/csv_service.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import 'contact_form_screen.dart';
+import 'device_contacts_screen.dart';
 
 enum _ContactFilter { all, authorized, unknown, optedOut }
 
@@ -47,7 +48,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
       if (!matchesFilter) return false;
       if (query.isEmpty) return true;
 
-      final matchesText = contact.name.toLowerCase().contains(query) ||
+      final matchesText =
+          contact.name.toLowerCase().contains(query) ||
           (contact.group ?? '').toLowerCase().contains(query);
       final matchesPhone = digits.isNotEmpty && contact.phone.contains(digits);
       return matchesText || matchesPhone;
@@ -65,6 +67,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         title: const Text('Contatos'),
         actions: [
           IconButton(
+            tooltip: 'Importar do celular',
+            onPressed: () => _importFromDevice(context),
+            icon: const Icon(Icons.contact_phone_rounded),
+          ),
+          IconButton(
             tooltip: 'Importar CSV',
             onPressed: () => _importCsv(context),
             icon: const Icon(Icons.upload_file_rounded),
@@ -73,8 +80,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
             onSelected: (value) {
               if (value == 'export') _exportCsv(context);
               if (value == 'import') _importCsv(context);
+              if (value == 'device') _importFromDevice(context);
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'device',
+                child: ListTile(
+                  leading: Icon(Icons.contact_phone_outlined),
+                  title: Text('Importar do celular'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               PopupMenuItem(
                 value: 'import',
                 child: ListTile(
@@ -151,7 +167,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 _FilterChip(
                   label: 'Descadastrados',
                   selected: _filter == _ContactFilter.optedOut,
-                  onTap: () => setState(() => _filter = _ContactFilter.optedOut),
+                  onTap: () =>
+                      setState(() => _filter = _ContactFilter.optedOut),
                 ),
               ],
             ),
@@ -166,13 +183,24 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         ? 'Nenhum contato ainda'
                         : 'Nada encontrado',
                     message: state.contacts.isEmpty
-                        ? 'Importe sua lista em CSV ou cadastre o primeiro contato manualmente.'
+                        ? 'Importe da agenda do celular, de um CSV ou cadastre o primeiro contato manualmente.'
                         : 'Ajuste a busca ou o filtro selecionado.',
                     action: state.contacts.isEmpty
-                        ? FilledButton.icon(
-                            onPressed: () => _importCsv(context),
-                            icon: const Icon(Icons.upload_file_rounded),
-                            label: const Text('Importar CSV'),
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: () => _importFromDevice(context),
+                                icon: const Icon(Icons.contact_phone_rounded),
+                                label: const Text('Importar do celular'),
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: () => _importCsv(context),
+                                icon: const Icon(Icons.upload_file_rounded),
+                                label: const Text('Importar CSV'),
+                              ),
+                            ],
                           )
                         : null,
                   )
@@ -252,15 +280,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
     if (context.mounted) showSnack(context, 'Contato excluído.');
   }
 
+  Future<void> _importFromDevice(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const DeviceContactsScreen()),
+    );
+  }
+
   Future<void> _importCsv(BuildContext context) async {
     final state = context.read<AppState>();
     final proceed = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) => _ImportSheet(
-        defaultDdi: state.settings.defaultDdi,
-      ),
+      builder: (context) => _ImportSheet(defaultDdi: state.settings.defaultDdi),
     );
     if (proceed != true || !context.mounted) return;
 
@@ -273,8 +305,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
       );
     } catch (_) {
       if (context.mounted) {
-        showSnack(context, 'Não foi possível abrir o seletor de arquivos.',
-            error: true);
+        showSnack(
+          context,
+          'Não foi possível abrir o seletor de arquivos.',
+          error: true,
+        );
       }
       return;
     }
@@ -344,12 +379,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final csv = CsvService.exportContacts(contacts);
     final result = await SharePlus.instance.share(
       ShareParams(
-        files: [
-          XFile.fromData(
-            utf8.encode(csv),
-            mimeType: 'text/csv',
-          ),
-        ],
+        files: [XFile.fromData(utf8.encode(csv), mimeType: 'text/csv')],
         fileNameOverrides: ['contatos_zmove.csv'],
         subject: 'Contatos ZMove Msg',
       ),
@@ -417,8 +447,8 @@ class _ContactTile extends StatelessWidget {
               Text(
                 PhoneUtils.format(contact.phone),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               if ((contact.group ?? '').isNotEmpty) ...[
                 const SizedBox(width: 6),
@@ -428,8 +458,8 @@ class _ContactTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
@@ -515,9 +545,7 @@ class _ImportSheet extends StatelessWidget {
         children: [
           Text(
             'Importar contatos (CSV)',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
+            style: Theme.of(context).textTheme.titleLarge
                 ?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 10),
@@ -525,9 +553,9 @@ class _ImportSheet extends StatelessWidget {
             'O arquivo deve ter as colunas nome e telefone. Grupo e autorização '
             'são opcionais. O separador pode ser vírgula ou ponto e vírgula.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  height: 1.5,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              height: 1.5,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
@@ -541,7 +569,11 @@ class _ImportSheet extends StatelessWidget {
               'nome;telefone;grupo;autorizado\n'
               'Maria Silva;11987654321;Clientes;sim\n'
               'João Souza;+(11) 91234-5678;Leads;não',
-              style: TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.5),
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                height: 1.5,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -549,8 +581,8 @@ class _ImportSheet extends StatelessWidget {
             'Telefones sem DDI recebem +$defaultDdi automaticamente. '
             'Contatos já existentes são atualizados pelo telefone.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 18),
           FilledButton.icon(

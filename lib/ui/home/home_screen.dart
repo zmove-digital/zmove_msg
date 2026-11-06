@@ -7,6 +7,7 @@ import '../../data/models.dart';
 import '../../state/app_state.dart';
 import '../campaign/new_campaign_screen.dart';
 import '../campaign/queue_screen.dart';
+import '../contacts/device_contacts_screen.dart';
 import '../shell.dart';
 import '../widgets/common.dart';
 
@@ -20,10 +21,13 @@ class HomeScreen extends StatelessWidget {
         .where((c) => (state.statsFor(c.id!)?.pending ?? 0) > 0)
         .take(3)
         .toList();
-    final authorized =
-        state.contacts.where((c) => c.optIn == OptIn.optedIn).length;
+    final authorized = state.contacts
+        .where((c) => c.optIn == OptIn.optedIn)
+        .length;
     final limit = state.settings.dailyLimit;
-    final progress = limit == 0 ? 0.0 : (state.sentToday / limit).clamp(0.0, 1.0);
+    final progress = limit == 0
+        ? 0.0
+        : (state.sentToday / limit).clamp(0.0, 1.0);
 
     return Scaffold(
       body: SafeArea(
@@ -40,18 +44,20 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         Text(
                           'ZMove Msg',
-                          style:
-                              Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.6,
-                                  ),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.6,
+                              ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           longDate(DateTime.now()),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color:
-                                    Theme.of(context).colorScheme.onSurfaceVariant,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                         ),
                       ],
@@ -65,7 +71,11 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 18),
-              _TodayCard(sentToday: state.sentToday, limit: limit, progress: progress),
+              _TodayCard(
+                sentToday: state.sentToday,
+                limit: limit,
+                progress: progress,
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -106,29 +116,30 @@ class HomeScreen extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             'Primeiros passos',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '1. Importe sua lista de clientes (CSV) ou cadastre manualmente.\n'
+                        '1. Importe os contatos do celular, de um CSV, ou cadastre manualmente.\n'
                         '2. Crie um modelo de mensagem com variáveis como {{primeiro_nome}}.\n'
                         '3. Faça o envio assistido: o app abre o WhatsApp com a mensagem pronta.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              height: 1.55,
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                          height: 1.55,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                       const SizedBox(height: 14),
                       FilledButton.icon(
-                        onPressed: () => ShellScope.of(context).goToTab(1),
-                        icon: const Icon(Icons.upload_file_rounded),
-                        label: const Text('Importar contatos'),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const DeviceContactsScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.contact_phone_rounded),
+                        label: const Text('Importar do celular'),
                       ),
                     ],
                   ),
@@ -162,9 +173,13 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _QuickTile(
-                      icon: Icons.upload_file_rounded,
-                      label: 'Importar CSV',
-                      onTap: () => ShellScope.of(context).goToTab(1),
+                      icon: Icons.contact_phone_rounded,
+                      label: 'Importar do celular',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DeviceContactsScreen(),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -200,7 +215,8 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 22),
               const StatusBanner(
                 icon: Icons.shield_outlined,
-                text: 'Envio assistido: o ZMove Msg abre o WhatsApp com a mensagem pronta '
+                text:
+                    'Envio assistido: o ZMove Msg abre o WhatsApp com a mensagem pronta '
                     'e você confirma o envio. Envie apenas para clientes que autorizaram '
                     'o contato e evite disparos em massa.',
               ),
@@ -213,13 +229,16 @@ class HomeScreen extends StatelessWidget {
 
   Future<void> _newCampaign(BuildContext context) async {
     if (context.read<AppState>().contacts.isEmpty) {
-      showSnack(context, 'Cadastre ou importe contatos antes de iniciar um envio.');
+      showSnack(
+        context,
+        'Cadastre ou importe contatos antes de iniciar um envio.',
+      );
       ShellScope.of(context).goToTab(1);
       return;
     }
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const NewCampaignScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const NewCampaignScreen()));
   }
 }
 
@@ -266,7 +285,10 @@ class _TodayCard extends StatelessWidget {
               const Spacer(),
               if (reached)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -365,9 +387,7 @@ class _CampaignCard extends StatelessWidget {
                   campaign.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
+                  style: Theme.of(context).textTheme.titleSmall
                       ?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -395,16 +415,17 @@ class _CampaignCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: stats?.progress ?? 0,
               minHeight: 6,
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '$sent de $total enviadas',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

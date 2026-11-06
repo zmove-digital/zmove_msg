@@ -6,7 +6,8 @@ Feito em Flutter, em português (pt-BR), Material 3, sem backend e sem API ofici
 
 ## Recursos
 
-- **Contatos** com nome, telefone, grupo, e-mail e controle de opt-in (autorizado / não autorizado / desconhecido).
+- **Contatos** com nome, telefone, grupo e controle de opt-in (autorizado / não autorizado / desconhecido).
+- **Importação da agenda do celular** com seleção manual, um a um (inclui os contatos sincronizados pelo WhatsApp).
 - **Importação de CSV** e exportação dos contatos.
 - **Modelos de mensagem** com variáveis: `{{nome}}`, `{{primeiro_nome}}`, `{{saudacao}}`, `{{telefone}}`, `{{grupo}}`, `{{empresa}}`, `{{remetente}}`, `{{data}}`.
 - **Envios** em 3 passos: escolher modelo → escolher contatos e mídia (opcional) → revisar e iniciar.
@@ -18,6 +19,7 @@ Feito em Flutter, em português (pt-BR), Material 3, sem backend e sem API ofici
 
 ## Limitações importantes
 
+- A importação pelo celular lê a **agenda do aparelho** (o Android pede a permissão de contatos). Contatos que existem somente dentro do WhatsApp, sem estarem salvos na agenda, não aparecem na lista.
 - O app **não envia sozinho**. Ele abre o WhatsApp com a mensagem preenchida; o disparo final é feito por você. Isso evita automações não oficiais e o risco de bloqueio do número.
 - Em links `wa.me` o texto chega ao WhatsApp, mas **anexos não podem ser incluídos pelo link**. Por isso, mídia usa o compartilhamento do sistema.
 - No Android 12+, o agendamento exato depende da permissão “Alarmes e lembretes”. Se ela não for concedida, o lembrete usa o agendamento inexato do sistema.
