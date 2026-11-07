@@ -13,6 +13,7 @@ Feito em Flutter, em português (pt-BR), Material 3, sem backend e sem API ofici
 - **Envios** em 3 passos: escolher modelo → escolher contatos e mídia (opcional) → revisar e iniciar.
 - **Fila assistida**: abre o WhatsApp com o texto pronto e confirma o status (enviado / pulado / pendente).
 - **Modo contínuo**: ao voltar do WhatsApp, o app registra o envio e abre o próximo contato automaticamente; dá para desfazer por alguns segundos ou desligar o modo na própria tela.
+- **Atalho de retorno**: durante a fila, uma notificação fixa **“ZMove Msg”** fica disponível; toque nela para voltar ao app sem passar pelo seletor de apps. O próximo contato abre sozinho.
 - **Envio de mídia** (imagem/PDF) via compartilhamento do Android: o texto é copiado para a área de transferência e o arquivo é compartilhado; escolha o contato no WhatsApp.
 - **Agendamento** de lembretes locais que abrem a fila no horário marcado.
 - **Relatórios** por campanha e histórico de envios.
@@ -22,6 +23,7 @@ Feito em Flutter, em português (pt-BR), Material 3, sem backend e sem API ofici
 
 - A importação pelo celular lê a **agenda do aparelho** (o Android pede a permissão de contatos). Contatos que existem somente dentro do WhatsApp, sem estarem salvos na agenda, não aparecem na lista.
 - O app **não envia sozinho**. Ele abre o WhatsApp com a mensagem preenchida; o disparo final é feito por você. Isso evita automações não oficiais e o risco de bloqueio do número.
+- O atalho de retorno depende da permissão de notificações (Android 13+). Se você negar, ainda pode voltar ao app pelo seletor de apps.
 - Em links `wa.me` o texto chega ao WhatsApp, mas **anexos não podem ser incluídos pelo link**. Por isso, mídia usa o compartilhamento do sistema.
 - No Android 12+, o agendamento exato depende da permissão “Alarmes e lembretes”. Se ela não for concedida, o lembrete usa o agendamento inexato do sistema.
 - O ícone de notificação é local; notificações exigem permissão no Android 13+.

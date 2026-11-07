@@ -15,11 +15,22 @@ class NotificationService {
   static const _channelDescription =
       'Avisos para continuar um envio agendado no ZMove Msg';
 
+  /// Notificacao fixa exibida durante a fila de envio. Tocar nela volta ao
+  /// app, que registra o envio e abre o proximo contato.
+  static const _returnChannelId = 'zmove_retorno';
+  static const _returnChannelName = 'Retorno rápido';
+  static const _returnChannelDescription =
+      'Atalho fixo para voltar ao ZMove Msg entre um envio e outro';
+  static const int returnNotificationId = 9001;
+
   static bool _initialized = false;
+  static bool _permissionAsked = false;
 
   /// Retorna o id da campanha quando o app foi aberto por um toque na
   /// notificacao (app estava fechado).
-  static Future<int?> init({required void Function(int campaignId) onOpen}) async {
+  static Future<int?> init({
+    required void Function(int campaignId) onOpen,
+  }) async {
     if (_initialized) return null;
     tzdata.initializeTimeZones();
 
@@ -44,8 +55,10 @@ class NotificationService {
   }
 
   static Future<bool> requestPermission() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return false;
 
     return await android.requestNotificationsPermission() ?? false;
@@ -54,16 +67,74 @@ class NotificationService {
   /// Abre a tela do sistema para permitir alarmes exatos (Android 12+).
   /// Se negado, os lembretes usam modo aproximado.
   static Future<void> requestExactAlarms() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await android?.requestExactAlarmsPermission();
   }
 
   static Future<bool> hasPermission() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return false;
     return await android.areNotificationsEnabled() ?? false;
+  }
+
+  /// Pede a permissao de notificacoes uma unica vez por sessao. Sem ela o
+  /// atalho de retorno nao aparece.
+  static Future<bool> ensurePermission() async {
+    if (await hasPermission()) return true;
+    if (_permissionAsked) return false;
+    _permissionAsked = true;
+    return requestPermission();
+  }
+
+  static Future<void> showReturnShortcut({
+    required String title,
+    required String body,
+    bool alert = false,
+  }) async {
+    if (!_initialized) return;
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _returnChannelId,
+        _returnChannelName,
+        channelDescription: _returnChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: 'ic_notification',
+        ongoing: true,
+        autoCancel: false,
+        onlyAlertOnce: !alert,
+        playSound: false,
+        enableVibration: false,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        styleInformation: const BigTextStyleInformation(''),
+      ),
+    );
+    try {
+      await _plugin.show(
+        id: returnNotificationId,
+        title: title,
+        body: body,
+        notificationDetails: details,
+      );
+    } catch (_) {
+      // Sem permissao ou canal bloqueado: o fluxo do app continua funcionando.
+    }
+  }
+
+  static Future<void> hideReturnShortcut() async {
+    if (!_initialized) return;
+    try {
+      await _plugin.cancel(id: returnNotificationId);
+    } catch (_) {
+      // Ignora falhas ao remover a notificacao.
+    }
   }
 
   static const _details = NotificationDetails(

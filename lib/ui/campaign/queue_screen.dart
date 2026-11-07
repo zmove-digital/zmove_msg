@@ -9,6 +9,7 @@ import '../../core/date_pt.dart';
 import '../../core/phone_utils.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
+import '../../services/notification_service.dart';
 import '../../services/whatsapp_service.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
@@ -35,17 +36,21 @@ class _QueueScreenState extends State<QueueScreen> with WidgetsBindingObserver {
   /// proximo contato, sem pedir confirmacao.
   bool _continuous = true;
   Timer? _advanceTimer;
+  Timer? _shortcutTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(NotificationService.ensurePermission());
     _load();
   }
 
   @override
   void dispose() {
     _advanceTimer?.cancel();
+    _shortcutTimer?.cancel();
+    unawaited(NotificationService.hideReturnShortcut());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -83,6 +88,51 @@ class _QueueScreenState extends State<QueueScreen> with WidgetsBindingObserver {
     );
     if (!mounted) return;
     setState(() => _entries = entries);
+    _refreshReturnShortcut();
+  }
+
+  /// Mantem a notificacao fixa "Volte para o ZMove" atualizada com o contato
+  /// da vez. E o atalho de um toque para retornar do WhatsApp.
+  void _refreshReturnShortcut() {
+    final current = _current;
+    if (!_continuous || current == null) {
+      unawaited(NotificationService.hideReturnShortcut());
+      return;
+    }
+    final remaining = (_entries?.length ?? 0) - _sentCount - _skippedCount;
+    unawaited(
+      NotificationService.showReturnShortcut(
+        title: 'ZMove Msg • ${widget.campaign.name}',
+        body:
+            'Toque aqui para voltar e abrir ${current.contact.name}. '
+            'Faltam $remaining neste envio.',
+      ),
+    );
+  }
+
+  /// Reexibe a notificacao logo depois de abrir o WhatsApp para que ela
+  /// apareca como um aviso silencioso sobre a conversa.
+  void _armReturnShortcut(QueueEntry entry) {
+    _shortcutTimer?.cancel();
+    unawaited(
+      NotificationService.showReturnShortcut(
+        title: 'ZMove Msg • ${widget.campaign.name}',
+        body:
+            'Envie no WhatsApp e toque aqui para abrir o próximo contato. '
+            'Agora: ${entry.contact.name}.',
+      ),
+    );
+    _shortcutTimer = Timer(const Duration(milliseconds: 1200), () {
+      unawaited(
+        NotificationService.showReturnShortcut(
+          title: 'ZMove Msg • ${widget.campaign.name}',
+          body:
+              'Envie no WhatsApp e toque aqui para voltar: o próximo contato '
+              'abre sozinho.',
+          alert: true,
+        ),
+      );
+    });
   }
 
   QueueEntry? get _current {
@@ -313,6 +363,7 @@ class _QueueScreenState extends State<QueueScreen> with WidgetsBindingObserver {
             onChanged: (value) {
               setState(() => _continuous = value);
               if (!value) _cancelAutoAdvance();
+              _refreshReturnShortcut();
             },
             contentPadding: const EdgeInsets.symmetric(horizontal: 14),
             secondary: Icon(
@@ -358,8 +409,8 @@ class _QueueScreenState extends State<QueueScreen> with WidgetsBindingObserver {
           const SizedBox(height: 8),
           Text(
             widget.campaign.mediaPath != null
-                ? 'Escolha o contato no WhatsApp, envie e volte: o próximo abre sozinho.'
-                : 'Envie no WhatsApp e volte: o próximo contato abre sozinho.',
+                ? 'Envie no WhatsApp e toque na notificação "ZMove Msg" para voltar: o próximo abre sozinho.'
+                : 'Envie no WhatsApp e toque na notificação "ZMove Msg" para voltar: o próximo contato abre sozinho.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -409,6 +460,7 @@ class _QueueScreenState extends State<QueueScreen> with WidgetsBindingObserver {
     if (_sending) return;
     _sending = true;
     _pendingItemId = entry.item.id;
+    _armReturnShortcut(entry);
     try {
       if (widget.campaign.mediaPath != null) {
         await _shareMedia(entry);
