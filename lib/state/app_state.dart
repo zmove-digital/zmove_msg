@@ -130,7 +130,8 @@ class AppState extends ChangeNotifier {
     const seeds = [
       MessageTemplate(
         name: 'Aviso rápido',
-        body: '{{saudacao}}, {{primeiro_nome}}! Tudo bem?\n\n'
+        body:
+            '{{saudacao}}, {{primeiro_nome}}! Tudo bem?\n\n'
             'Passando para avisar que seu pedido está pronto. '
             'Pode retirar no horário de sempre.\n\n'
             'Qualquer dúvida é só responder aqui.\n\n'
@@ -138,7 +139,8 @@ class AppState extends ChangeNotifier {
       ),
       MessageTemplate(
         name: 'Cobrança amigável',
-        body: 'Olá, {{primeiro_nome}}! {{saudacao}}.\n\n'
+        body:
+            'Olá, {{primeiro_nome}}! {{saudacao}}.\n\n'
             'Passando para lembrar do valor referente ao seu pedido, '
             'com vencimento em {{data}}.\n\n'
             'Se já pagou, pode desconsiderar esta mensagem. '
@@ -147,7 +149,8 @@ class AppState extends ChangeNotifier {
       ),
       MessageTemplate(
         name: 'Promoção',
-        body: '{{saudacao}}, {{primeiro_nome}}! 🎉\n\n'
+        body:
+            '{{saudacao}}, {{primeiro_nome}}! 🎉\n\n'
             'Temos uma novidade especial para você esta semana. '
             'Aproveite as condições exclusivas enquanto durar o estoque!\n\n'
             'Quer saber mais? Responda esta mensagem.\n\n'
@@ -176,11 +179,10 @@ class AppState extends ChangeNotifier {
     final db = await _database.database;
     final batch = db.batch();
     next.toMap().forEach((key, value) {
-      batch.insert(
-        'settings',
-        {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      batch.insert('settings', {
+        'key': key,
+        'value': value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
     await batch.commit(noResult: true);
     settings = next;
@@ -356,7 +358,8 @@ class AppState extends ChangeNotifier {
 
   Future<List<QueueEntry>> entriesFor(int campaignId) async {
     final db = await _database.database;
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT i.id AS i_id, i.campaign_id AS i_campaign, i.contact_id AS i_contact,
              i.rendered_text AS i_text, i.status AS i_status, i.sent_at AS i_sent,
              c.name AS c_name, c.phone AS c_phone, c.group_name AS c_group,
@@ -366,7 +369,9 @@ class AppState extends ChangeNotifier {
       INNER JOIN contacts c ON c.id = i.contact_id
       WHERE i.campaign_id = ?
       ORDER BY i.id ASC
-    ''', [campaignId]);
+    ''',
+      [campaignId],
+    );
 
     return rows.map((row) {
       final contact = Contact(
@@ -400,8 +405,9 @@ class AppState extends ChangeNotifier {
       'campaign_items',
       {
         'status': status.db,
-        'sent_at':
-            status == SendStatus.sent ? now.millisecondsSinceEpoch : null,
+        'sent_at': status == SendStatus.sent
+            ? now.millisecondsSinceEpoch
+            : null,
       },
       where: 'id = ?',
       whereArgs: [item.id],
@@ -413,15 +419,43 @@ class AppState extends ChangeNotifier {
         where: 'id = ?',
         whereArgs: [item.contactId],
       );
+    } else {
+      // Ao desfazer/pular, o ultimo envio volta a ser o item enviado mais
+      // recente que restou para este contato.
+      await _recomputeLastSent(db, item.contactId);
     }
     await _reloadCounters(db);
     notifyListeners();
   }
 
+  Future<void> _recomputeLastSent(Database db, int contactId) async {
+    final row = await db.rawQuery(
+      "SELECT MAX(sent_at) AS last FROM campaign_items "
+      "WHERE contact_id = ? AND status = 'sent'",
+      [contactId],
+    );
+    await db.update(
+      'contacts',
+      {'last_sent_at': row.first['last'] as int?},
+      where: 'id = ?',
+      whereArgs: [contactId],
+    );
+  }
+
   Future<void> deleteCampaign(int id) async {
     final db = await _database.database;
+    final affected = await db.query(
+      'campaign_items',
+      columns: ['contact_id'],
+      where: 'campaign_id = ?',
+      whereArgs: [id],
+    );
+    final contactIds = {for (final row in affected) row['contact_id'] as int};
     await db.delete('campaigns', where: 'id = ?', whereArgs: [id]);
     await db.delete('schedules', where: 'campaign_id = ?', whereArgs: [id]);
+    for (final contactId in contactIds) {
+      await _recomputeLastSent(db, contactId);
+    }
     await refresh();
   }
 
