@@ -11,7 +11,8 @@ Feito em Flutter, em português (pt-BR), Material 3, sem backend e sem API ofici
 - **Importação de CSV** e exportação dos contatos.
 - **Modelos de mensagem** com variáveis: `{{nome}}`, `{{primeiro_nome}}`, `{{saudacao}}`, `{{telefone}}`, `{{grupo}}`, `{{empresa}}`, `{{remetente}}`, `{{data}}`.
 - **Envios** em 3 passos: escolher modelo → escolher contatos e mídia (opcional) → revisar e iniciar.
-- **Fila assistida**: abre o WhatsApp com o texto pronto, volta ao app e confirma o status (enviado / pulado / pendente).
+- **Fila assistida**: abre o WhatsApp com o texto pronto e confirma o status (enviado / pulado / pendente).
+- **Modo contínuo**: ao voltar do WhatsApp, o app registra o envio e abre o próximo contato automaticamente; dá para desfazer por alguns segundos ou desligar o modo na própria tela.
 - **Envio de mídia** (imagem/PDF) via compartilhamento do Android: o texto é copiado para a área de transferência e o arquivo é compartilhado; escolha o contato no WhatsApp.
 - **Agendamento** de lembretes locais que abrem a fila no horário marcado.
 - **Relatórios** por campanha e histórico de envios.
