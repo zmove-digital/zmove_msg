@@ -21,7 +21,10 @@ class WhatsAppService {
 
     for (final uri in candidates) {
       try {
-        final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        final opened = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
         if (opened) return true;
       } catch (_) {
         // tenta o proximo formato de link
@@ -30,21 +33,21 @@ class WhatsAppService {
     return false;
   }
 
-  /// Compartilha midia (imagem/PDF) + legenda. O usuario escolhe o contato
+  /// Compartilha midia (imagens/PDF) + legenda. O usuario escolhe o contato
   /// dentro do WhatsApp, pois nao existe link oficial com anexo + destinatario.
   static Future<bool> shareMedia({
-    required String path,
+    required List<String> paths,
     required String text,
   }) async {
-    final file = File(path);
-    if (!await file.exists()) return false;
+    final files = <XFile>[];
+    for (final path in paths) {
+      final file = File(path);
+      if (await file.exists()) files.add(XFile(path));
+    }
+    if (files.isEmpty) return false;
 
     final result = await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(path)],
-        text: text,
-        subject: 'ZMove Msg',
-      ),
+      ShareParams(files: files, text: text, subject: 'ZMove Msg'),
     );
     return result.status == ShareResultStatus.success;
   }

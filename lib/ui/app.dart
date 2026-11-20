@@ -12,6 +12,28 @@ import 'shell.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Acompanha o nome da rota no topo da pilha. Serve para evitar abrir a mesma
+/// fila de envio duas vezes quando o usuario toca no lembrete com a tela ja
+/// aberta.
+class _TopRouteObserver extends NavigatorObserver {
+  String? topName;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    topName = route.settings.name;
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    topName = previousRoute?.settings.name;
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    topName = newRoute?.settings.name;
+  }
+}
+
 class ZMoveApp extends StatefulWidget {
   const ZMoveApp({super.key});
 
@@ -22,6 +44,7 @@ class ZMoveApp extends StatefulWidget {
 class _ZMoveAppState extends State<ZMoveApp> {
   Timer? _splashTimer;
   bool _splashFinished = false;
+  final _routeObserver = _TopRouteObserver();
 
   @override
   void initState() {
@@ -45,12 +68,11 @@ class _ZMoveAppState extends State<ZMoveApp> {
 
   void _openCampaign(int campaignId) {
     if (!mounted) return;
+    if (_routeObserver.topName == QueueScreen.routeName(campaignId)) return;
     final state = context.read<AppState>();
     final campaign = state.campaignById(campaignId);
     if (campaign == null) return;
-    rootNavigatorKey.currentState?.push(
-      MaterialPageRoute<void>(builder: (_) => QueueScreen(campaign: campaign)),
-    );
+    rootNavigatorKey.currentState?.push(QueueScreen.route(campaign));
   }
 
   @override
@@ -61,6 +83,7 @@ class _ZMoveAppState extends State<ZMoveApp> {
       title: 'ZMove Msg',
       debugShowCheckedModeBanner: false,
       navigatorKey: rootNavigatorKey,
+      navigatorObservers: [_routeObserver],
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,

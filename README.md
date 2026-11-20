@@ -6,6 +6,9 @@ Feito em Flutter, em português (pt-BR), Material 3, sem backend e sem API ofici
 
 ## Recursos
 
+- **Envio em lote com intervalo**: escolha 5, 10, 20, 30 min (ou outro valor) e uma janela de horário; o app avisa quando for hora de enviar e agenda o próximo contato, sem abrir um atrás do outro.
+- **Vários anexos por envio**: selecione até 10 fotos/PDFs para compartilhar junto com o texto.
+
 - **Contatos** com nome, telefone, grupo e controle de opt-in (autorizado / não autorizado / desconhecido).
 - **Importação da agenda do celular** com seleção manual, um a um (inclui os contatos sincronizados pelo WhatsApp).
 - **Importação de CSV** e exportação dos contatos.

@@ -382,11 +382,7 @@ class _CampaignCard extends StatelessWidget {
     final pending = stats?.pending ?? 0;
 
     return SurfaceCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => QueueScreen(campaign: campaign),
-        ),
-      ),
+      onTap: () => Navigator.of(context).push(QueueScreen.route(campaign)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

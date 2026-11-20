@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/date_pt.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
+import '../../services/batch_scheduler.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import 'queue_screen.dart';
@@ -16,7 +17,8 @@ class CampaignDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final stats = state.statsFor(campaign.id!) ??
+    final stats =
+        state.statsFor(campaign.id!) ??
         const CampaignStats(total: 0, sent: 0, skipped: 0, pending: 0);
 
     return Scaffold(
@@ -34,6 +36,7 @@ class CampaignDetailScreen extends StatelessWidget {
                 destructive: true,
               );
               if (!ok || !context.mounted) return;
+              await BatchScheduler.cancel(campaign.id!);
               await state.deleteCampaign(campaign.id!);
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -87,8 +90,9 @@ class CampaignDetailScreen extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: stats.progress,
                   minHeight: 10,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest,
                 ),
               ),
               const SizedBox(height: 8),
@@ -96,22 +100,46 @@ class CampaignDetailScreen extends StatelessWidget {
                 '${stats.total} contato(s) no total • criado em '
                 '${campaign.createdAt == null ? '—' : dateTimeLabel(campaign.createdAt!)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-              if (campaign.mediaName != null) ...[
+              if (campaign.hasMedia) ...[
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.attach_file_rounded,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.attach_file_rounded,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        campaign.mediaName!,
+                        campaign.media.length == 1
+                            ? campaign.media.first.name
+                            : '${campaign.media.length} anexos',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (campaign.intervalMinutes > 0) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_send_rounded,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Envio em lote a cada '
+                        '${BatchScheduler.intervalLabel(campaign.intervalMinutes)}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -121,11 +149,8 @@ class CampaignDetailScreen extends StatelessWidget {
               const SizedBox(height: 16),
               if (stats.pending > 0)
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => QueueScreen(campaign: campaign),
-                    ),
-                  ),
+                  onPressed: () =>
+                      Navigator.of(context).push(QueueScreen.route(campaign)),
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: Text('Continuar envio (${stats.pending} pendentes)'),
                   style: FilledButton.styleFrom(
@@ -168,10 +193,8 @@ class CampaignDetailScreen extends StatelessWidget {
                                   entry.item.sentAt == null
                                       ? _statusLabel(entry.item.status)
                                       : '${_statusLabel(entry.item.status)} • '
-                                          '${dateTimeLabel(entry.item.sentAt!)}',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
+                                            '${dateTimeLabel(entry.item.sentAt!)}',
+                                  style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
                                         color: Theme.of(context)
                                             .colorScheme
@@ -192,11 +215,8 @@ class CampaignDetailScreen extends StatelessWidget {
       ),
       floatingActionButton: stats.pending > 0
           ? FloatingActionButton.extended(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => QueueScreen(campaign: campaign),
-                ),
-              ),
+              onPressed: () =>
+                  Navigator.of(context).push(QueueScreen.route(campaign)),
               icon: const Icon(Icons.send_rounded),
               label: const Text('Continuar'),
             )
@@ -205,11 +225,11 @@ class CampaignDetailScreen extends StatelessWidget {
   }
 
   static String _statusLabel(SendStatus status) => switch (status) {
-        SendStatus.sent => 'Enviado',
-        SendStatus.skipped => 'Pulado',
-        SendStatus.failed => 'Falhou',
-        SendStatus.pending => 'Pendente',
-      };
+    SendStatus.sent => 'Enviado',
+    SendStatus.skipped => 'Pulado',
+    SendStatus.failed => 'Falhou',
+    SendStatus.pending => 'Pendente',
+  };
 }
 
 class _StatusIcon extends StatelessWidget {
@@ -223,7 +243,10 @@ class _StatusIcon extends StatelessWidget {
       SendStatus.sent => (Icons.check_circle_rounded, AppColors.success),
       SendStatus.skipped => (Icons.skip_next_rounded, AppColors.warning),
       SendStatus.failed => (Icons.error_rounded, AppColors.danger),
-      SendStatus.pending => (Icons.radio_button_unchecked_rounded, AppColors.brand),
+      SendStatus.pending => (
+        Icons.radio_button_unchecked_rounded,
+        AppColors.brand,
+      ),
     };
     return Icon(icon, color: color, size: 22);
   }

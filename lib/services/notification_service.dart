@@ -192,6 +192,83 @@ class NotificationService {
     }
   }
 
+  /// Id fixo por campanha para o lembrete do envio em lote.
+  static int batchNotificationId(int campaignId) => 20000 + campaignId;
+
+  /// Agenda o lembrete de "hora de enviar para o proximo contato".
+  static Future<bool> scheduleBatchReminder({
+    required int campaignId,
+    required String title,
+    required String body,
+    required DateTime at,
+  }) async {
+    if (!_initialized) return false;
+
+    final when = tz.TZDateTime.from(at.toUtc(), tz.UTC);
+    if (when.isBefore(tz.TZDateTime.now(tz.UTC))) return false;
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: 'ic_notification',
+        category: AndroidNotificationCategory.reminder,
+        styleInformation: const BigTextStyleInformation(''),
+      ),
+    );
+
+    try {
+      await _plugin.zonedSchedule(
+        id: batchNotificationId(campaignId),
+        title: title,
+        body: body,
+        scheduledDate: when,
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: '$campaignId',
+      );
+      return true;
+    } catch (_) {
+      try {
+        await _plugin.zonedSchedule(
+          id: batchNotificationId(campaignId),
+          title: title,
+          body: body,
+          scheduledDate: when,
+          notificationDetails: details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: '$campaignId',
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
+  static Future<void> cancelBatchReminder(int campaignId) async {
+    if (!_initialized) return;
+    try {
+      await _plugin.cancel(id: batchNotificationId(campaignId));
+    } catch (_) {
+      // Ignora falhas ao remover o lembrete.
+    }
+  }
+
+  static Future<bool> isBatchReminderScheduled(int campaignId) async {
+    if (!_initialized) return false;
+    try {
+      final pending = await _plugin.pendingNotificationRequests();
+      final id = batchNotificationId(campaignId);
+      return pending.any((request) => request.id == id);
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> cancel(int id) async {
     if (!_initialized) return;
     await _plugin.cancel(id: id);

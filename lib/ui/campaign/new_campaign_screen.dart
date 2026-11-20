@@ -9,6 +9,7 @@ import '../../core/phone_utils.dart';
 import '../../core/template_renderer.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
+import '../../services/batch_scheduler.dart';
 import '../../services/media_store.dart';
 import '../../state/app_state.dart';
 import '../templates/template_edit_screen.dart';
@@ -30,8 +31,8 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
 
   int _step = 0;
   MessageTemplate? _template;
-  String? _mediaPath;
-  String? _mediaName;
+  List<CampaignMedia> _media = [];
+  int _intervalMinutes = 0;
   final Set<int> _selected = {};
   _ContactFilter _filter = _ContactFilter.authorized;
   String _query = '';
@@ -145,59 +146,61 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
               ),
             ),
         const SizedBox(height: 18),
-        SectionHeader(title: 'Anexo (opcional)'),
-        if (_mediaPath == null)
+        SectionHeader(title: 'Anexos (opcional)'),
+        if (_media.isEmpty)
           OutlinedButton.icon(
-            onPressed: () => _pickMedia(context),
+            onPressed: () => _pickMedia(),
             icon: const Icon(Icons.attach_file_rounded),
-            label: const Text('Anexar imagem ou PDF'),
+            label: const Text('Anexar fotos ou PDF'),
           )
-        else
-          SurfaceCard(
-            child: Row(
-              children: [
-                Icon(
-                  _mediaName?.toLowerCase().endsWith('.pdf') ?? false
-                      ? Icons.picture_as_pdf_outlined
-                      : Icons.image_outlined,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _mediaName ?? 'Anexo',
+        else ...[
+          for (final media in _media)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SurfaceCard(
+                child: Row(
+                  children: [
+                    Icon(
+                      media.name.toLowerCase().endsWith('.pdf')
+                          ? Icons.picture_as_pdf_outlined
+                          : Icons.image_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        media.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      Text(
-                        'Será compartilhado pelo menu do Android',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      tooltip: 'Remover anexo',
+                      onPressed: () => setState(() {
+                        _media.remove(media);
+                      }),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Remover anexo',
-                  onPressed: () => setState(() {
-                    _mediaPath = null;
-                    _mediaName = null;
-                  }),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
+              ),
+            ),
+          OutlinedButton.icon(
+            onPressed: () => _pickMedia(),
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: Text(
+              _media.length >= 10
+                  ? 'Limite de 10 anexos'
+                  : 'Adicionar mais anexos (${_media.length}/10)',
             ),
           ),
+        ],
         const SizedBox(height: 10),
         const StatusBanner(
           icon: Icons.info_outline,
-          text: 'O texto abre direto na conversa do cliente. Para anexos, o '
+          text:
+              'O texto abre direto na conversa do cliente. Para anexos, o '
               'WhatsApp pede que você escolha o contato no compartilhamento '
               '(limitação do próprio WhatsApp para envio assistido).',
         ),
@@ -226,8 +229,9 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
 
   Widget _buildContactsStep(AppState state) {
     final contacts = _visibleContacts(state);
-    final authorizedCount =
-        state.contacts.where((c) => c.optIn == OptIn.optedIn).length;
+    final authorizedCount = state.contacts
+        .where((c) => c.optIn == OptIn.optedIn)
+        .length;
 
     return Column(
       key: const ValueKey(1),
@@ -268,7 +272,8 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
                 label: const Text('Não descadastrados'),
                 selected: _filter == _ContactFilter.unknown,
                 showCheckmark: false,
-                onSelected: (_) => setState(() => _filter = _ContactFilter.unknown),
+                onSelected: (_) =>
+                    setState(() => _filter = _ContactFilter.unknown),
               ),
               const SizedBox(width: 8),
               ChoiceChip(
@@ -287,25 +292,26 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
               Text(
                 '${_selected.length} selecionado(s)',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const Spacer(),
               TextButton(
                 onPressed: contacts.isEmpty
                     ? null
                     : () => setState(() {
-                          final allSelected =
-                              contacts.every((c) => _selected.contains(c.id));
-                          if (allSelected) {
-                            for (final c in contacts) {
-                              _selected.remove(c.id);
-                            }
-                          } else {
-                            _selected.addAll(contacts.map((c) => c.id!));
+                        final allSelected = contacts.every(
+                          (c) => _selected.contains(c.id),
+                        );
+                        if (allSelected) {
+                          for (final c in contacts) {
+                            _selected.remove(c.id);
                           }
-                        }),
+                        } else {
+                          _selected.addAll(contacts.map((c) => c.id!));
+                        }
+                      }),
                 child: Text(
                   contacts.isNotEmpty &&
                           contacts.every((c) => _selected.contains(c.id))
@@ -395,7 +401,9 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
         .where((c) => _selected.contains(c.id))
         .toList();
     final optedOut = selectedContacts.where((c) => c.optIn == OptIn.optedOut);
-    final previewContact = selectedContacts.isNotEmpty ? selectedContacts.first : null;
+    final previewContact = selectedContacts.isNotEmpty
+        ? selectedContacts.first
+        : null;
     final preview = previewContact == null || _template == null
         ? ''
         : TemplateRenderer.render(
@@ -429,16 +437,50 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
                 label: 'Contatos',
                 value: '${selectedContacts.length} selecionado(s)',
               ),
-              if (_mediaName != null) ...[
+              if (_intervalMinutes > 0) ...[
+                const SizedBox(height: 12),
+                _SummaryRow(
+                  icon: Icons.schedule_send_rounded,
+                  label: 'Intervalo',
+                  value:
+                      '${BatchScheduler.intervalLabel(_intervalMinutes)} '
+                      'entre contatos',
+                ),
+              ],
+              if (_media.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _SummaryRow(
                   icon: Icons.attach_file_rounded,
-                  label: 'Anexo',
-                  value: _mediaName!,
+                  label: 'Anexos',
+                  value: _media.length == 1
+                      ? _media.first.name
+                      : '${_media.length} arquivos',
                 ),
               ],
             ],
           ),
+        ),
+        const SizedBox(height: 18),
+        SectionHeader(title: 'Envio em lote (opcional)'),
+        Text(
+          'Escolha o intervalo entre um contato e o próximo. O app avisa '
+          'quando for hora de enviar; o envio continua confirmado por você.',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final value in const [0, 5, 10, 20, 30])
+              ChoiceChip(
+                label: Text(value == 0 ? 'Desligado' : '$value min'),
+                selected: _intervalMinutes == value,
+                showCheckmark: false,
+                onSelected: (_) => setState(() => _intervalMinutes = value),
+              ),
+          ],
         ),
         if (optedOut.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -487,8 +529,10 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     constraints: const BoxConstraints(maxWidth: 320),
                     decoration: const BoxDecoration(
                       color: Color(0xFFDCF8C6),
@@ -515,7 +559,8 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
         const SizedBox(height: 18),
         const StatusBanner(
           icon: Icons.touch_app_outlined,
-          text: 'O envio é assistido: o WhatsApp abre com a mensagem pronta e você '
+          text:
+              'O envio é assistido: o WhatsApp abre com a mensagem pronta e você '
               'confirma o envio. São cerca de 2 toques por contato.',
         ),
       ],
@@ -533,9 +578,7 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
-        ),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Row(
         children: [
@@ -567,7 +610,9 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Icon(
-                      _step < 2 ? Icons.arrow_forward_rounded : Icons.send_rounded,
+                      _step < 2
+                          ? Icons.arrow_forward_rounded
+                          : Icons.send_rounded,
                     ),
               label: Text(_step < 2 ? 'Continuar' : 'Iniciar envio'),
               style: FilledButton.styleFrom(
@@ -580,34 +625,48 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
     );
   }
 
-  Future<void> _pickMedia(BuildContext context) async {
+  Future<void> _pickMedia() async {
+    if (_media.length >= 10) {
+      showSnack(context, 'Limite de 10 anexos por envio.', error: true);
+      return;
+    }
     try {
-      final file = await FilePicker.pickFile(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
-        dialogTitle: 'Escolha o anexo',
+        dialogTitle: 'Escolha os anexos',
       );
-      if (file == null || !mounted) return;
+      if (files.isEmpty || !mounted) return;
 
-      File? persisted;
-      if (file.path != null) {
-        persisted = await MediaStore.persist(file.path!);
-      } else {
-        final bytes = await file.readAsBytes();
-        final temp = File(
-          '${Directory.systemTemp.path}${Platform.pathSeparator}${file.name}',
-        );
-        await temp.writeAsBytes(bytes);
-        persisted = await MediaStore.persist(temp.path);
+      final added = <CampaignMedia>[];
+      for (final file in files) {
+        if (_media.length + added.length >= 10) break;
+        File? persisted;
+        if (file.path != null) {
+          persisted = await MediaStore.persist(file.path!);
+        } else {
+          final bytes = await file.readAsBytes();
+          final temp = File(
+            '${Directory.systemTemp.path}${Platform.pathSeparator}${file.name}',
+          );
+          await temp.writeAsBytes(bytes);
+          persisted = await MediaStore.persist(temp.path);
+        }
+        if (persisted != null) {
+          added.add(CampaignMedia(path: persisted.path, name: file.name));
+        }
       }
 
-      if (persisted == null || !mounted) return;
-      final savedPath = persisted.path;
-      final savedName = file.name;
-      setState(() {
-        _mediaPath = savedPath;
-        _mediaName = savedName;
-      });
+      if (added.isEmpty || !mounted) return;
+      setState(() => _media = [..._media, ...added]);
+      final skipped = files.length - added.length;
+      if (skipped > 0) {
+        showSnack(
+          context,
+          'Limite de 10 anexos. $skipped arquivo(s) ignorado(s).',
+          error: true,
+        );
+      }
     } catch (_) {
       if (context.mounted) {
         showSnack(context, 'Não foi possível anexar o arquivo.', error: true);
@@ -629,17 +688,13 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
         name: _nameController.text.trim(),
         template: template,
         selected: selected,
-        mediaPath: _mediaPath,
-        mediaName: _mediaName,
+        media: _media,
+        intervalMinutes: _intervalMinutes,
       );
       if (!mounted) return;
       final campaign = state.campaignById(campaignId);
       if (campaign == null) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => QueueScreen(campaign: campaign),
-        ),
-      );
+      Navigator.of(context).pushReplacement(QueueScreen.route(campaign));
     } catch (_) {
       if (!mounted) return;
       setState(() => _starting = false);
@@ -684,14 +739,19 @@ class _StepperHeader extends StatelessWidget {
                         : colors.surfaceContainerHighest,
                   ),
                   child: i < step
-                      ? const Icon(Icons.check_rounded,
-                          size: 15, color: Colors.white)
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 15,
+                          color: Colors.white,
+                        )
                       : Text(
                           '${i + 1}',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            color: i <= step ? Colors.white : colors.onSurfaceVariant,
+                            color: i <= step
+                                ? Colors.white
+                                : colors.onSurfaceVariant,
                           ),
                         ),
                 ),
@@ -766,9 +826,8 @@ class _TemplateOption extends StatelessWidget {
                     template.body.replaceAll('\n', ' '),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: colors.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -803,9 +862,8 @@ class _SummaryRow extends StatelessWidget {
           width: 72,
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: colors.onSurfaceVariant),
           ),
         ),
         Expanded(

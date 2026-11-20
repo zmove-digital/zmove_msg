@@ -72,11 +72,7 @@ class _ScheduleCard extends StatelessWidget {
     return SurfaceCard(
       onTap: campaign == null
           ? null
-          : () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => QueueScreen(campaign: campaign),
-                ),
-              ),
+          : () => Navigator.of(context).push(QueueScreen.route(campaign)),
       child: Row(
         children: [
           Container(

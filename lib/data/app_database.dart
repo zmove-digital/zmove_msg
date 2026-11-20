@@ -13,7 +13,7 @@ class AppDatabase {
     final dir = await getDatabasesPath();
     return openDatabase(
       p.join(dir, 'zmove_msg.db'),
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -46,6 +46,10 @@ class AppDatabase {
             template_id INTEGER,
             media_path TEXT,
             media_name TEXT,
+            media_items TEXT,
+            interval_minutes INTEGER NOT NULL DEFAULT 0,
+            window_start INTEGER NOT NULL DEFAULT 480,
+            window_end INTEGER NOT NULL DEFAULT 1200,
             created_at INTEGER NOT NULL
           )
         ''');
@@ -80,6 +84,24 @@ class AppDatabase {
           )
         ''');
         await batch.commit(noResult: true);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // Envio em lote (intervalo) + multiplos anexos por campanha.
+          await db.execute('ALTER TABLE campaigns ADD COLUMN media_items TEXT');
+          await db.execute(
+            'ALTER TABLE campaigns ADD COLUMN interval_minutes '
+            'INTEGER NOT NULL DEFAULT 0',
+          );
+          await db.execute(
+            'ALTER TABLE campaigns ADD COLUMN window_start '
+            'INTEGER NOT NULL DEFAULT 480',
+          );
+          await db.execute(
+            'ALTER TABLE campaigns ADD COLUMN window_end '
+            'INTEGER NOT NULL DEFAULT 1200',
+          );
+        }
       },
     );
   }

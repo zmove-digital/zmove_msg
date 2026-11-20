@@ -321,8 +321,10 @@ class AppState extends ChangeNotifier {
     required String name,
     required MessageTemplate template,
     required List<Contact> selected,
-    String? mediaPath,
-    String? mediaName,
+    List<CampaignMedia> media = const <CampaignMedia>[],
+    int intervalMinutes = 0,
+    int windowStart = 8 * 60,
+    int windowEnd = 20 * 60,
   }) async {
     final db = await _database.database;
     final now = DateTime.now();
@@ -331,8 +333,10 @@ class AppState extends ChangeNotifier {
       Campaign(
         name: name,
         templateId: template.id,
-        mediaPath: mediaPath,
-        mediaName: mediaName,
+        media: media,
+        intervalMinutes: intervalMinutes,
+        windowStart: windowStart,
+        windowEnd: windowEnd,
         createdAt: now,
       ).toMap(),
     );
@@ -354,6 +358,27 @@ class AppState extends ChangeNotifier {
     await batch.commit(noResult: true);
     await refresh();
     return campaignId;
+  }
+
+  /// Ajusta o envio em lote de uma campanha ja criada (intervalo e janela).
+  Future<void> updateCampaignBatch(
+    int campaignId, {
+    required int intervalMinutes,
+    required int windowStart,
+    required int windowEnd,
+  }) async {
+    final db = await _database.database;
+    await db.update(
+      'campaigns',
+      {
+        'interval_minutes': intervalMinutes,
+        'window_start': windowStart,
+        'window_end': windowEnd,
+      },
+      where: 'id = ?',
+      whereArgs: [campaignId],
+    );
+    await refresh();
   }
 
   Future<List<QueueEntry>> entriesFor(int campaignId) async {
